@@ -1,0 +1,24 @@
+.:53 {
+    log
+    errors
+    cancel
+    cache {
+        success 3600
+        denial 30
+    }
+
+    hosts {
+        192.168.8.4 dns.lan
+        fallthrough
+    }
+
+    template IN ANY {
+        match "^.*\.shared-services\.talos\.lan\.$"
+        answer "{{ .Name }} 3600 IN A 192.168.11.68"
+        fallthrough
+    }
+
+    forward . 1.1.1.1 8.8.8.8 {
+        max_concurrent 100
+    }
+}

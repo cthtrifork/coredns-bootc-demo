@@ -1,0 +1,9 @@
+[[customizations.user]]
+name = "cthtrifork"
+password = ""
+key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB0hdmkkeD2IWZfMYQt/JSNE9QV7ky9QSb9yqpfPHEKE cthtrifork@github/110127566 # ssh-import-id gh:cthtrifork"
+groups = ["wheel"]
+
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "20 GiB"
