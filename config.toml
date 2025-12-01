@@ -1,7 +1,7 @@
 [[customizations.user]]
 name = "cthtrifork"
 password = ""
-key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB0hdmkkeD2IWZfMYQt/JSNE9QV7ky9QSb9yqpfPHEKE cthtrifork@github/110127566 # ssh-import-id gh:cthtrifork"
+key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB0hdmkkeD2IWZfMYQt/JSNE9QV7ky9QSb9yqpfPHEKE cthtrifork"
 groups = ["wheel"]
 
 [[customizations.filesystem]]

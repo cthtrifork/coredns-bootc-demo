@@ -24,11 +24,11 @@ podman run -d --name local-registry \
 1. **Build & push the image**
 
 ```sh
-podman build -f ./Containerfile -t localhost/coredns-bootc:v1 ./
-podman tag \
+sudo podman build -f ./Containerfile -t localhost/coredns-bootc:v1 ./
+sudo podman tag \
   localhost/coredns-bootc:v1 \
   localhost:5000/coredns-bootc:v1
-podman push -q --tls-verify=false \
+sudo podman push -q --tls-verify=false \
   localhost:5000/coredns-bootc:v1
 ```
 
@@ -36,7 +36,7 @@ podman push -q --tls-verify=false \
 
 ```sh
 sudo podman pull docker.io/coredns/coredns:1.13.1
-sudo podman pull -q --tls-verify=false localhost:5000/coredns-bootc:v1
+mkdir -p out
 sudo podman run --rm -it --privileged \
   -v /var/lib/containers/storage:/var/lib/containers/storage:Z \
   -v "./out":/output:Z \
@@ -47,13 +47,6 @@ sudo podman run --rm -it --privileged \
   --rootfs xfs --type qcow2 \
   localhost:5000/coredns-bootc:v1
 ```
-1. **Test container locally**
-
-```sh
-sudo podman run --rm -ti localhost:5000/coredns-bootc:v1
-sudo podman exec -it <container_name> bash
-```
-
 1. **Test VM locally**
 
 ```sh
@@ -62,20 +55,16 @@ sudo qemu-system-x86_64 \
   -enable-kvm \
   -cpu host \
   -m 4G \
-  -drive if=virtio,file="./qcow2/disk.qcow2",format=qcow2 \
+  -drive if=virtio,file="./out/qcow2/disk.qcow2",format=qcow2 \
   -net nic,model=virtio \
-  -net user,hostfwd=tcp::5000-:5000 \
-  -net user,hostfwd=tcp::2222-:22 \
-  -display none \
-  -monitor unix:/tmp/qemu-monitor-sock,server,nowait \
-  -daemonize
-```
+  -net user,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:53 \
+  -monitor unix:/tmp/qemu-monitor-sock,server,nowait
+``` 
 
 ```sh
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-      -p 2222 \
-      cthtrifork@localhost \
-      "sudo bootc status"
+echo quit | sudo socat - unix-connect:/tmp/qemu-monitor-sock
+ps aux | grep qemu
+sudo pkill -9 qemu-system
 ```
 
 **VM Requirements:**
@@ -90,21 +79,30 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeou
 ## Troubleshooting & Debugging
 
 ### Build Issues
+
 - Use `--no-cache` with Podman if you encounter build problems.
 
 ### VM Access & DNS Verification
+
 ```sh
 # SSH into the VM
-ssh <user>@<vm_ip>
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+  -i /home/caspertdk/.ssh/id_ed25519 \
+  -p 2222 \
+  cthtrifork@localhost
+
+# Switch to local registry on host
+sudo bootc status
+sudo bootc switch 10.0.2.2:5000/coredns-bootc:v1
 
 # Verify DNS is working
-dig @<vm_ip> google.com
-
-# Force update (if needed)
-sudo systemctl start bootc-fetch-apply-updates.service
+dig -p 5533 @localhost google.com
+# Will this work?
+dig -p 5533 @localhost myservice.lan
 ```
 
-### Service Status
+### DNS Service Status
+
 ```sh
 # Check CoreDNS service status
 systemctl status coredns.service
