@@ -1,4 +1,4 @@
-FROM quay.io/centos-bootc/centos-bootc:stream9
+FROM quay.io/fedora/fedora-bootc:43
 
 #setup sudo to not require password
 RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo
@@ -17,13 +17,19 @@ COPY coredns.container /usr/share/containers/systemd
 RUN ln -s /usr/share/containers/systemd/coredns.container /usr/lib/bootc/bound-images.d/coredns.container
 COPY Corefile /etc/coredns/
 
-# Hack to allow pulling from local insecure registry
+# Hack to allow pulling from local insecure registry on host machine
 RUN mkdir -p /etc/containers/registries.conf.d \
  && printf '%s\n' \
       '[[registry]]' \
       'location = "10.0.2.2:5000"' \
       'insecure = true' \
     > /etc/containers/registries.conf.d/99-local-registry.conf
+
+# Services
+RUN systemctl enable \
+    firewalld.service \
+    && systemctl disable \
+    avahi-daemon
 
 # Networking
 EXPOSE 53

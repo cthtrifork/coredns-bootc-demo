@@ -51,13 +51,13 @@ sudo podman run --rm -it --privileged \
 
 ```sh
 sudo qemu-system-x86_64 \
-  -name bootc-vm \
+  -name coredns-bootc-vm \
   -enable-kvm \
   -cpu host \
   -m 4G \
   -drive if=virtio,file="./out/qcow2/disk.qcow2",format=qcow2 \
   -net nic,model=virtio \
-  -net user,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:53 \
+  -net user,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:5533 \
   -monitor unix:/tmp/qemu-monitor-sock,server,nowait
 ``` 
 
@@ -96,7 +96,7 @@ sudo bootc status
 sudo bootc switch 10.0.2.2:5000/coredns-bootc:v1
 
 # Verify DNS is working
-dig -p 5533 @localhost google.com
+dig -p 5533 @localhost google.com +short
 # Will this work?
 dig -p 5533 @localhost myservice.lan
 ```
@@ -110,6 +110,8 @@ systemctl status coredns.service
 journalctl -u coredns.service -b
 # Show service file
 systemctl cat coredns.service
+# List services
+sudo systemctl list-unit-files --type=service --state=enabled --no-pager
 ```
 
 ## References

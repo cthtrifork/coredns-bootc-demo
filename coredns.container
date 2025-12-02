@@ -1,26 +1,19 @@
 [Unit]
 # https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
 Description=Run a coredns server
+Wants=network-online.target
+After=network-online.target
 
 [Container]
-# https://docs.fedoraproject.org/en-US/bootc/embedding-containers/#_embedding_quadlets_into_a_bootc_image
-#GlobalArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
+# Use the bootc image store
 PodmanArgs=--storage-opt=additionalimagestore=/usr/lib/bootc/storage
 Image=docker.io/coredns/coredns:1.13.1
-PublishPort=53:53/tcp
-PublishPort=53:53/udp
+PublishPort=5533:53/tcp
+PublishPort=5533:53/udp
 AutoUpdate=local
 Environment=GOMAXPROCS=4
-Volume=/etc/coredns/Corefile:/Corefile
+Volume=/etc/coredns/Corefile:/Corefile:ro
 ReadOnly=true
 
 [Install]
-WantedBy=default.target
-
-[Service]
-Restart=always
-
-# Debugging
-# systemctl status coredns.service
-# journalctl -u coredns.service -b
-# systemctl cat coredns.service
+WantedBy=multi-user.target
