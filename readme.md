@@ -110,8 +110,7 @@ systemctl status coredns.service
 journalctl -u coredns.service -b
 # Show service file
 systemctl cat coredns.service
-# List services
-sudo systemctl list-unit-files --type=service --state=enabled --no-pager
+
 ```
 
 ## References

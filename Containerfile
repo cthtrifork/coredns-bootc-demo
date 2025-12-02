@@ -26,6 +26,7 @@ RUN mkdir -p /etc/containers/registries.conf.d \
     > /etc/containers/registries.conf.d/99-local-registry.conf
 
 # Services
+# Overview: sudo systemctl list-unit-files --type=service --state=enabled --no-pager
 RUN systemctl enable \
     firewalld.service \
     && systemctl disable \
