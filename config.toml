@@ -1,7 +1,16 @@
+[customizations.kernel]
+append = "systemd.hostname=coredns-bootc"
+
 [[customizations.user]]
 name = "cthtrifork"
 password = ""
 key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB0hdmkkeD2IWZfMYQt/JSNE9QV7ky9QSb9yqpfPHEKE cthtrifork"
+groups = ["wheel"]
+
+[[customizations.user]]
+name = "cthtrifork"
+password = ""
+key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqaU50I7pQ4PtbX9CaQCfrcovKklJyhHT6Fm80djQDX caspert@gmail.com"
 groups = ["wheel"]
 
 [[customizations.filesystem]]
