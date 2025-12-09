@@ -4,7 +4,7 @@ FROM quay.io/fedora/fedora-bootc:43
 RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo
 
 # Write some metadata
-RUN echo VARIANT="CoreDNS bootc OS" && echo VARIANT_ID=com.gitlab.energinet.kube-kraken-images >> /usr/lib/os-release
+RUN echo VARIANT="CoreDNS bootc OS" && echo VARIANT_ID=com.github.com.cthtrifork.corednsdemo >> /usr/lib/os-release
 
 # Install utilities
 RUN dnf -y install qemu-guest-agent \
@@ -26,11 +26,10 @@ RUN mkdir -p /etc/containers/registries.conf.d \
     > /etc/containers/registries.conf.d/99-local-registry.conf
 
 # Services
-# Overview: sudo systemctl list-unit-files --type=service --state=enabled --no-pager
 RUN systemctl enable \
-    firewalld.service \
+        firewalld.service \
     && systemctl disable \
-    avahi-daemon
+        avahi-daemon
 
 # Networking
 EXPOSE 53

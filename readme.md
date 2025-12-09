@@ -10,8 +10,19 @@ This project provides an OS image with a pre-configured [CoreDNS](https://coredn
 - Configurable via `/etc/coredns/Corefile` (mounted into the container)
 - Auto-update support
 
-## Quick Start
+![architecture](img/architecture.drawio.png)
 
+## Configuration
+- The CoreDNS container is defined in [`coredns.container`](./coredns.container). See [Podman Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) and [Fedora bootc container embedding](https://docs.fedoraproject.org/en-US/bootc/embedding-containers/#_embedding_quadlets_into_a_bootc_image) for details.
+- The DNS configuration is provided via [`Corefile`](./Corefile) and mounted into the container at runtime.
+
+### VM Requirements
+- Use the vmdk or qcow2 as the hard drive or use an .iso when doing first install.
+- Minimum 2GiB memory recommended
+- Disk size can be expanded after first boot
+
+
+## Quick Start
 
 1. **Start a local registry**
 
@@ -24,10 +35,13 @@ podman run -d --name local-registry \
 1. **Build & push the image**
 
 ```sh
+# Build
 sudo podman build -f ./Containerfile -t localhost/coredns-bootc:v1 ./
+# Tag for remote
 sudo podman tag \
   localhost/coredns-bootc:v1 \
   localhost:5000/coredns-bootc:v1
+# Push to remote
 sudo podman push -q --tls-verify=false \
   localhost:5000/coredns-bootc:v1
 ```
@@ -61,28 +75,13 @@ sudo qemu-system-x86_64 \
   -monitor unix:/tmp/qemu-monitor-sock,server,nowait
 ``` 
 
+1. **Verify DNS is working**
+
 ```sh
-echo quit | sudo socat - unix-connect:/tmp/qemu-monitor-sock
-ps aux | grep qemu
-sudo pkill -9 qemu-system
+dig -p 5533 @localhost google.com +short
 ```
 
-**VM Requirements:**
-- Use the vmdk or qcow2 as the hard drive
-- Minimum 2GiB memory recommended
-- Disk size can be expanded after first boot
-
-## Configuration
-- The CoreDNS container is defined in [`coredns.container`](./coredns.container). See [Podman Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) and [Fedora bootc container embedding](https://docs.fedoraproject.org/en-US/bootc/embedding-containers/#_embedding_quadlets_into_a_bootc_image) for details.
-- The DNS configuration is provided via [`Corefile`](./Corefile) and mounted into the container at runtime.
-
-## Troubleshooting & Debugging
-
-### Build Issues
-
-- Use `--no-cache` with Podman if you encounter build problems.
-
-### VM Access & DNS Verification
+1. **VM Access and tour**
 
 ```sh
 # SSH into the VM
@@ -94,11 +93,54 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeou
 # Switch to local registry on host
 sudo bootc status
 sudo bootc switch 10.0.2.2:5000/coredns-bootc:v1
+```
 
-# Verify DNS is working
-dig -p 5533 @localhost google.com +short
-# Will this work?
+Showcase
+
+- Footprint & Resources usage
+- Filesystem - df & lsblk
+- bootc status
+- systemctl list-timers
+
+Bonus (Homeserver)
+
+- tmpfiles.d
+- SBOM+CoSign+Trivy
+- fastfetch
+
+## Demo overview
+
+![demo overview](img/demos.drawio.png)
+
+1. **Update container**
+```sh
+# Let us make this work
 dig -p 5533 @localhost myservice.lan
+```
+1. **Toolbox**
+
+> Is cowsay available on my distro?
+
+2. **Rollback**
+
+```sh
+# Snippet
+RUN mkdir -p /etc/motd.d && \
+    cowsay "I am a bootable container" | sudo tee /etc/motd.d/10-cowsay-motm > /dev/null
+```
+
+
+## Troubleshooting & Debugging
+
+### Build Issues
+
+- Use `--no-cache` with Podman if you encounter build problems.
+
+### Shutting down qemu forcefully
+```sh
+echo quit | sudo socat - unix-connect:/tmp/qemu-monitor-sock
+ps aux | grep qemu
+sudo pkill -9 qemu-system
 ```
 
 ### DNS Service Status
@@ -110,7 +152,6 @@ systemctl status coredns.service
 journalctl -u coredns.service -b
 # Show service file
 systemctl cat coredns.service
-
 ```
 
 ## References
