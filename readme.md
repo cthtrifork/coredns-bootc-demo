@@ -107,6 +107,7 @@ Bonus (Homeserver)
 - tmpfiles.d
 - SBOM+CoSign+Trivy
 - fastfetch
+- Github PRs with renovatebot
 
 ## Demo overview
 
