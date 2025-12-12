@@ -97,10 +97,11 @@ sudo bootc switch 10.0.2.2:5000/coredns-bootc:v1
 
 Showcase
 
-- Footprint & Resources usage
-- Filesystem - df & lsblk
 - bootc status
-- systemctl list-timers
+- Footprint & Resources usage - free and hostnamectl
+- Filesystem - df & lsblk & pwd
+- sudo podman stats & systemctl status coredn.service
+- systemctl list-timers & systemd-analyze critical-chain 
 
 Bonus (Homeserver)
 
@@ -116,7 +117,7 @@ Bonus (Homeserver)
 1. **Update container**
 ```sh
 # Let us make this work
-dig -p 5533 @localhost myservice.lan
+dig -p 5533 @localhost myservice.lan +short
 ```
 1. **Toolbox**
 
