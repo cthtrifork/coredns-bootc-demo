@@ -4,7 +4,8 @@ FROM quay.io/fedora/fedora-bootc:43
 RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo
 
 # Write some metadata
-RUN echo VARIANT="CoreDNS bootc OS" && echo VARIANT_ID=com.github.com.cthtrifork.corednsdemo >> /usr/lib/os-release
+RUN echo VARIANT=\"CoreDNS bootc OS\" >> /usr/lib/os-release && \
+    echo VARIANT_ID=com.github.com.cthtrifork.corednsdemo >> /usr/lib/os-release
 
 # Install utilities
 RUN dnf -y install qemu-guest-agent \
