@@ -48,7 +48,7 @@ jobs:
       - name: Build and push the base image (v1)
         run: |
           sudo podman build -f ./Containerfile -t localhost/coredns-bootc:v1 ./
-          # bootc-image-builder no longer pulls, so the registry-qualified name must exist locally
+          # bootc install pulls from local storage, so the registry-qualified name must exist locally
           sudo podman tag localhost/coredns-bootc:v1 "$REGISTRY/coredns-bootc:v1"
           sudo podman push -q --tls-verify=false "$REGISTRY/coredns-bootc:v1"
 
