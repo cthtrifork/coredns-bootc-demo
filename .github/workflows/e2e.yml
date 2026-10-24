@@ -197,7 +197,9 @@ jobs:
           motd=$(vm cat /etc/motd.d/10-cowsay-motm)
           echo "$motd"
           grep -q 'I am a bootable container' <<<"$motd"
-          vm cowsay -n hello | grep -q hello
+          said=$(vm cowsay hello)
+          echo "$said"
+          grep -q hello <<<"$said"
 
       - name: "Rollback demo: v1 is back"
         run: |
