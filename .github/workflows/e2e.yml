@@ -151,8 +151,12 @@ jobs:
           # Is cowsay available on my distro? No ...
           if vm command -v cowsay; then echo 'cowsay should not be on the host' >&2; exit 1; fi
           # ... but a toolbox-style container can provide it without touching the host
-          out=$(vm sudo podman run --rm registry.fedoraproject.org/fedora-toolbox:43 \
-            bash -c 'dnf -y -q install cowsay >/dev/null && cowsay "Hello from the toolbox"')
+          # The script goes over stdin: ssh would flatten a quoted `bash -c '...'` argument
+          out=$(vm sudo podman run --rm -i registry.fedoraproject.org/fedora-toolbox:43 bash -s <<'SCRIPT'
+          dnf -y -q install cowsay >/dev/null
+          cowsay "Hello from the toolbox"
+          SCRIPT
+          )
           echo "$out"
           grep -q 'Hello from the toolbox' <<<"$out"
           if vm command -v cowsay; then echo 'cowsay leaked onto the host' >&2; exit 1; fi
