@@ -33,8 +33,8 @@ RUN systemctl enable \
 
 # Networking
 EXPOSE 53
-RUN firewall-offline-cmd --add-port 53/udp && \
-    firewall-offline-cmd --add-port 53/tcp && \
+RUN firewall-offline-cmd --add-port 5533/udp && \
+    firewall-offline-cmd --add-port 5533/tcp && \
     firewall-offline-cmd --add-service=dns
 
 # Clean up caches in the image and lint the container
