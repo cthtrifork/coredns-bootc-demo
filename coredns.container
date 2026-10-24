@@ -15,5 +15,8 @@ Environment=GOMAXPROCS=4
 Volume=/etc/coredns/Corefile:/Corefile:ro
 ReadOnly=true
 
+[Service]
+Restart=always
+
 [Install]
 WantedBy=multi-user.target
