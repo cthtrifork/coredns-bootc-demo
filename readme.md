@@ -73,7 +73,7 @@ sudo qemu-system-x86_64 \
   -net nic,model=virtio \
   -net user,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:5533 \
   -monitor unix:/tmp/qemu-monitor-sock,server,nowait
-``` 
+```
 
 1. **Verify DNS is working**
 
@@ -100,7 +100,7 @@ Showcase
 - bootc status
 - Footprint & Resources usage - free and hostnamectl
 - Filesystem - df & lsblk & pwd
-- sudo podman stats & systemctl status coredn.service
+- sudo podman stats & systemctl status coredns.service
 - systemctl list-timers & systemd-analyze critical-chain 
 
 Bonus (Homeserver)
@@ -119,11 +119,11 @@ Bonus (Homeserver)
 # Let us make this work
 dig -p 5533 @localhost myservice.lan +short
 ```
-1. **Toolbox**
+2. **Toolbox**
 
 > Is cowsay available on my distro?
 
-2. **Rollback**
+3. **Rollback**
 
 ```sh
 # Snippet
