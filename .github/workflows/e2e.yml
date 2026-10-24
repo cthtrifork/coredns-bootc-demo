@@ -69,31 +69,28 @@ jobs:
           sudo podman push -q --tls-verify=false \
             localhost/coredns-bootc:v2 "$REGISTRY/coredns-bootc:v2"
 
-      - name: Build qcow2 with bootc-image-builder
+      - name: Install the image to a disk with bootc
         run: |
+          # bootc-image-builder fails to resolve the bound CoreDNS image on the runner
+          # ("overlay/.has-mount-program: read-only file system"), so install straight
+          # from the image with bootc itself, as the bootc docs describe.
           ssh-keygen -q -t ed25519 -N '' -f "$RUNNER_TEMP/id_ed25519"
-          cat > "$RUNNER_TEMP/config.toml" <<EOF2
-          [[customizations.user]]
-          name = "ci"
-          password = ""
-          key = "$(cat "$RUNNER_TEMP/id_ed25519.pub")"
-          groups = ["wheel"]
-
-          [[customizations.filesystem]]
-          mountpoint = "/"
-          minsize = "20 GiB"
-          EOF2
-          sudo podman pull docker.io/coredns/coredns:1.13.1
           mkdir -p out
-          sudo podman run --rm --privileged \
-            -v /var/lib/containers/storage:/var/lib/containers/storage \
-            -v "$PWD/out":/output \
-            -v "$RUNNER_TEMP/config.toml":/config.toml:ro \
+          cp "$RUNNER_TEMP/id_ed25519.pub" out/authorized_keys
+          truncate -s 20G out/disk.raw
+          sudo podman pull docker.io/coredns/coredns:1.13.1
+          sudo podman run --rm --privileged --pid=host \
             --security-opt label=type:unconfined_t \
-            --pull newer \
-            quay.io/centos-bootc/bootc-image-builder:latest \
-            --rootfs xfs --type qcow2 \
-            "$REGISTRY/coredns-bootc:v1"
+            -v /dev:/dev \
+            -v /var/lib/containers:/var/lib/containers \
+            -v "$PWD/out":/data \
+            "$REGISTRY/coredns-bootc:v1" \
+            bootc install to-disk --via-loopback --generic-image \
+              --filesystem xfs \
+              --karg console=ttyS0 \
+              --target-imgref "$VM_REGISTRY/coredns-bootc:v1" \
+              --root-ssh-authorized-keys /data/authorized_keys \
+              /data/disk.raw
 
       - name: Boot the VM
         run: |
@@ -103,7 +100,7 @@ jobs:
           #!/usr/bin/env bash
           exec ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \\
             -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes \\
-            -i "$RUNNER_TEMP/id_ed25519" -p 2222 ci@127.0.0.1 "\$@"
+            -i "$RUNNER_TEMP/id_ed25519" -p 2222 root@127.0.0.1 "\$@"
           EOF2
           chmod +x "$RUNNER_TEMP/bin/vm"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
@@ -111,7 +108,7 @@ jobs:
           qemu-system-x86_64 \
             -name coredns-bootc-vm \
             -accel kvm -cpu host -smp 2 -m 4G \
-            -drive if=virtio,file=out/qcow2/disk.qcow2,format=qcow2 \
+            -drive if=virtio,file=out/disk.raw,format=raw \
             -netdev user,id=n0,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:5533,hostfwd=tcp::5533-:5533 \
             -device virtio-net-pci,netdev=n0 \
             -display none -serial "file:$RUNNER_TEMP/serial.log" \
