@@ -2,8 +2,9 @@ name: e2e
 
 # Boots the image in QEMU and walks through the demos from the readme:
 #   1. DNS answers on 5533 (UDP + TCP)
-#   2. Update: bootc switch to an image with a myservice.lan record and a cowsay motd
-#   3. Rollback: the record and the motd are gone again
+#   2. Toolbox: cowsay is not on the host, but runs in a toolbox container
+#   3. Update: bootc switch to an image with a myservice.lan record and a cowsay motd
+#   4. Rollback: the record and the motd are gone again
 
 on:
   push:
@@ -146,6 +147,17 @@ jobs:
 
           # No cowsay motd on the base image
           if vm test -e /etc/motd.d/10-cowsay-motm; then echo 'unexpected motd' >&2; exit 1; fi
+
+      - name: "Toolbox demo: cowsay is not on the host but runs in a container"
+        run: |
+          # Is cowsay available on my distro? No ...
+          if vm command -v cowsay; then echo 'cowsay should not be on the host' >&2; exit 1; fi
+          # ... but a toolbox-style container can provide it without touching the host
+          out=$(vm sudo podman run --rm registry.fedoraproject.org/fedora-toolbox:43 \
+            bash -c 'dnf -y -q install cowsay >/dev/null && cowsay "Hello from the toolbox"')
+          echo "$out"
+          grep -q 'Hello from the toolbox' <<<"$out"
+          if vm command -v cowsay; then echo 'cowsay leaked onto the host' >&2; exit 1; fi
 
       - name: "Update demo: bootc switch to v2"
         run: |
