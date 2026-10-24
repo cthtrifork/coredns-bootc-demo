@@ -1,0 +1,232 @@
+name: e2e
+
+# Boots the image in QEMU and walks through the demos from the readme:
+#   1. DNS answers on 5533 (UDP + TCP)
+#   2. Update: bootc switch to an image with a myservice.lan record and a cowsay motd
+#   3. Rollback: the record and the motd are gone again
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: localhost:5000
+  # How the VM sees the registry running on the runner
+  VM_REGISTRY: 10.0.2.2:5000
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 dnsutils openssh-client
+          # Allow the runner user to use /dev/kvm
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start local registry
+        run: |
+          sudo podman run -d --name local-registry -p 5000:5000 docker.io/library/registry:3
+
+      - name: Build and push the base image (v1)
+        run: |
+          sudo podman build -f ./Containerfile -t localhost/coredns-bootc:v1 ./
+          sudo podman push -q --tls-verify=false \
+            localhost/coredns-bootc:v1 "$REGISTRY/coredns-bootc:v1"
+
+      - name: Build and push the demo image (v2)
+        run: |
+          # Update demo: a record for myservice.lan ...
+          sed 's/^\( *\)#192\.168\.8\.4 myservice\.lan/\1192.168.8.4 myservice.lan/' Corefile > "$RUNNER_TEMP/Corefile.demo"
+          grep -q '^ *192\.168\.8\.4 myservice\.lan' "$RUNNER_TEMP/Corefile.demo"
+          # ... and the cowsay motd from the rollback demo
+          cat > "$RUNNER_TEMP/Containerfile.demo" <<'CF'
+          FROM localhost/coredns-bootc:v1
+          COPY Corefile.demo /etc/coredns/Corefile
+          RUN dnf -y install cowsay && dnf clean all
+          RUN mkdir -p /etc/motd.d && \
+              cowsay "I am a bootable container" > /etc/motd.d/10-cowsay-motm
+          CF
+          sudo podman build -f "$RUNNER_TEMP/Containerfile.demo" -t localhost/coredns-bootc:v2 "$RUNNER_TEMP"
+          sudo podman push -q --tls-verify=false \
+            localhost/coredns-bootc:v2 "$REGISTRY/coredns-bootc:v2"
+
+      - name: Build qcow2 with bootc-image-builder
+        run: |
+          ssh-keygen -q -t ed25519 -N '' -f "$RUNNER_TEMP/id_ed25519"
+          cat > "$RUNNER_TEMP/config.toml" <<EOF2
+          [[customizations.user]]
+          name = "ci"
+          password = ""
+          key = "$(cat "$RUNNER_TEMP/id_ed25519.pub")"
+          groups = ["wheel"]
+
+          [[customizations.filesystem]]
+          mountpoint = "/"
+          minsize = "20 GiB"
+          EOF2
+          sudo podman pull docker.io/coredns/coredns:1.13.1
+          mkdir -p out
+          sudo podman run --rm --privileged \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            -v "$PWD/out":/output \
+            -v "$RUNNER_TEMP/config.toml":/config.toml:ro \
+            --security-opt label=type:unconfined_t \
+            --pull newer \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --rootfs xfs --type qcow2 \
+            "$REGISTRY/coredns-bootc:v1"
+
+      - name: Boot the VM
+        run: |
+          # Helper to run commands in the VM
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/vm" <<EOF2
+          #!/usr/bin/env bash
+          exec ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \\
+            -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes \\
+            -i "$RUNNER_TEMP/id_ed25519" -p 2222 ci@127.0.0.1 "\$@"
+          EOF2
+          chmod +x "$RUNNER_TEMP/bin/vm"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+          qemu-system-x86_64 \
+            -name coredns-bootc-vm \
+            -accel kvm -cpu host -smp 2 -m 4G \
+            -drive if=virtio,file=out/qcow2/disk.qcow2,format=qcow2 \
+            -netdev user,id=n0,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:5533,hostfwd=tcp::5533-:5533 \
+            -device virtio-net-pci,netdev=n0 \
+            -display none -serial "file:$RUNNER_TEMP/serial.log" \
+            -pidfile "$RUNNER_TEMP/qemu.pid" -daemonize
+
+      - name: Wait for SSH
+        run: |
+          for i in $(seq 1 90); do
+            vm true 2>/dev/null && exit 0
+            sleep 5
+          done
+          echo "VM did not become reachable over SSH" >&2
+          exit 1
+
+      - name: "DNS demo: base image resolves over UDP and TCP"
+        run: |
+          # The CoreDNS service is up in the VM
+          for i in $(seq 1 30); do
+            vm systemctl is-active --quiet coredns.service && break
+            sleep 5
+          done
+          vm systemctl is-active coredns.service
+
+          udp=$(dig -p 5533 @127.0.0.1 example.com +short +time=3 +tries=3)
+          tcp=$(dig -p 5533 @127.0.0.1 example.com +short +tcp +time=3 +tries=3)
+          echo "udp: $udp"; echo "tcp: $tcp"
+          test -n "$udp"
+          test -n "$tcp"
+
+          # myservice.lan is not known yet
+          status=$(dig -p 5533 @127.0.0.1 myservice.lan +time=3 +tries=3 | grep -o 'status: [A-Z]*')
+          echo "$status"
+          test "$status" = "status: NXDOMAIN"
+
+          # No cowsay motd on the base image
+          if vm test -e /etc/motd.d/10-cowsay-motm; then echo 'unexpected motd' >&2; exit 1; fi
+
+      - name: "Update demo: bootc switch to v2"
+        run: |
+          before=$(vm cat /proc/sys/kernel/random/boot_id)
+          echo "$before" > "$RUNNER_TEMP/boot_id"
+          vm sudo bootc switch "$VM_REGISTRY/coredns-bootc:v2"
+          vm sudo systemctl reboot || true
+
+          sleep 10
+          for i in $(seq 1 90); do
+            after=$(vm cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
+            [ -n "$after" ] && [ "$after" != "$before" ] && exit 0
+            sleep 5
+          done
+          echo "VM did not come back after reboot" >&2
+          exit 1
+
+      - name: "Update demo: myservice.lan and cowsay motd are live"
+        run: |
+          vm sudo bootc status
+          test "$(vm sudo bootc status --json | jq -r .status.booted.image.image.image)" = "$VM_REGISTRY/coredns-bootc:v2"
+
+          for i in $(seq 1 30); do
+            vm systemctl is-active --quiet coredns.service && break
+            sleep 5
+          done
+
+          answer=$(dig -p 5533 @127.0.0.1 myservice.lan +short +time=3 +tries=3)
+          echo "myservice.lan -> $answer"
+          test "$answer" = "192.168.8.4"
+
+          # Records the Corefile does not know still fall through to the upstream
+          test -n "$(dig -p 5533 @127.0.0.1 example.com +short +time=3 +tries=3)"
+
+          motd=$(vm cat /etc/motd.d/10-cowsay-motm)
+          echo "$motd"
+          grep -q 'I am a bootable container' <<<"$motd"
+          vm cowsay -n hello | grep -q hello
+
+      - name: "Rollback demo: v1 is back"
+        run: |
+          before=$(vm cat /proc/sys/kernel/random/boot_id)
+          vm sudo bootc rollback
+          vm sudo systemctl reboot || true
+
+          sleep 10
+          for i in $(seq 1 90); do
+            after=$(vm cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
+            [ -n "$after" ] && [ "$after" != "$before" ] && break
+            sleep 5
+          done
+          test "$after" != "$before"
+
+          for i in $(seq 1 30); do
+            vm systemctl is-active --quiet coredns.service && break
+            sleep 5
+          done
+
+          status=$(dig -p 5533 @127.0.0.1 myservice.lan +time=3 +tries=3 | grep -o 'status: [A-Z]*')
+          test "$status" = "status: NXDOMAIN"
+          if vm test -e /etc/motd.d/10-cowsay-motm; then echo 'unexpected motd' >&2; exit 1; fi
+          if vm command -v cowsay; then echo 'cowsay should be gone' >&2; exit 1; fi
+
+      - name: Collect VM logs
+        if: always()
+        run: |
+          vm sudo journalctl -b --no-pager -u coredns.service > "$RUNNER_TEMP/coredns.log" 2>&1 || true
+          vm sudo bootc status > "$RUNNER_TEMP/bootc-status.txt" 2>&1 || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            ${{ runner.temp }}/serial.log
+            ${{ runner.temp }}/coredns.log
+            ${{ runner.temp }}/bootc-status.txt
+          if-no-files-found: ignore
+
+      - name: Stop the VM
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/qemu.pid" ]; then kill "$(cat "$RUNNER_TEMP/qemu.pid")" || true; fi
