@@ -29,8 +29,7 @@ RUN mkdir -p /etc/containers/registries.conf.d \
 # Services
 RUN systemctl enable \
         firewalld.service \
-    && systemctl disable \
-        avahi-daemon
+    && (systemctl disable avahi-daemon || true)
 
 # Networking
 EXPOSE 53
