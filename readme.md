@@ -71,7 +71,7 @@ sudo qemu-system-x86_64 \
   -m 4G \
   -drive if=virtio,file="./out/qcow2/disk.qcow2",format=qcow2 \
   -net nic,model=virtio \
-  -net user,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:5533 \
+  -net user,hostfwd=tcp::2222-:22,hostfwd=udp::5533-:5533,hostfwd=tcp::5533-:5533 \
   -monitor unix:/tmp/qemu-monitor-sock,server,nowait
 ```
 
