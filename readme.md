@@ -4,7 +4,7 @@
 This project provides an OS image with a pre-configured [CoreDNS](https://coredns.io/) service running on port 53, exposing DNS for the DEV environment. The image is built and provisioned using [bootc](https://bootc-dev.github.io/bootc/), eliminating the need for configuration management tools like Ansible, Terraform, or Chef.
 
 ## Features
-- CoreDNS container (1.13.13) running as a systemd service
+- CoreDNS container (1.13.1) running as a systemd service
 - DNS exposed on TCP/UDP port 53
 - Read-only container filesystem for security
 - Configurable via `/etc/coredns/Corefile` (mounted into the container)
