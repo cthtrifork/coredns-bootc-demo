@@ -1,16 +1,30 @@
 
 # CoreDNS Bootc Image
 
-This project provides an OS image with a pre-configured [CoreDNS](https://coredns.io/) service running on port 53, exposing DNS for the DEV environment. The image is built and provisioned using [bootc](https://bootc-dev.github.io/bootc/), eliminating the need for configuration management tools like Ansible, Terraform, or Chef.
+This project provides an OS image with a pre-configured [CoreDNS](https://coredns.io/) service, exposing DNS for the DEV environment. The image is built and provisioned using [bootc](https://bootc-dev.github.io/bootc/), eliminating the need for configuration management tools like Ansible, Terraform, or Chef.
 
 ## Features
 - CoreDNS container (1.13.1) running as a systemd service
-- DNS exposed on TCP/UDP port 53
+- DNS exposed on TCP/UDP port 5533 of the VM (CoreDNS listens on 53 inside the container, see [Ports](#ports))
 - Read-only container filesystem for security
 - Configurable via `/etc/coredns/Corefile` (mounted into the container)
 - Auto-update support
 
 ![architecture](img/architecture.drawio.png)
+
+## Ports
+
+The port numbers differ per layer; this is intentional.
+
+| Where | Port | Set in |
+|---|---|---|
+| CoreDNS inside the container | 53 | [`Corefile`](./Corefile) (`.:53`) |
+| VM (published by Podman, reached by DNS clients) | 5533 (TCP + UDP) | `PublishPort=5533:53/...` in [`coredns.container`](./coredns.container) |
+| Host running the demo VM in QEMU | 5533 (forwarded to the VM) | `hostfwd=...::5533-:5533` in the QEMU command below |
+
+Query with `dig -p 5533 @<vm-or-localhost> <name>`.
+
+Port 53 is not published on the VM, so the port 53 rules in the `Containerfile` (`EXPOSE 53` and the firewalld ports) do not affect DNS clients. In CI, DNS on 5533 is reachable without a firewalld rule for 5533 (a previous PR proposing one was closed for that reason). Only add one if you expose the port beyond this setup and can show it is blocked.
 
 ## Configuration
 - The CoreDNS container is defined in [`coredns.container`](./coredns.container). See [Podman Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) and [Fedora bootc container embedding](https://docs.fedoraproject.org/en-US/bootc/embedding-containers/#_embedding_quadlets_into_a_bootc_image) for details.
@@ -131,6 +145,17 @@ RUN mkdir -p /etc/motd.d && \
     cowsay "I am a bootable container" | tee /etc/motd.d/10-cowsay-motm > /dev/null
 ```
 
+
+## Testing
+
+The [`e2e`](.github/workflows/e2e.yml) workflow builds the image, installs it to a disk with `bootc install to-disk`, boots it in QEMU and runs the demos:
+
+1. DNS answers on 5533 over UDP and TCP
+2. Toolbox: cowsay is not on the host but runs in a container
+3. Update: `bootc switch` to an image with a `myservice.lan` record and a cowsay motd
+4. Rollback: back to the original image
+
+It installs with `bootc install to-disk`, not bootc-image-builder, so it does not test the qcow2 build or `config.toml`. The CI VM uses a generated SSH key for `root`.
 
 ## Troubleshooting & Debugging
 
