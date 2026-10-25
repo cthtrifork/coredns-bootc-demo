@@ -26,5 +26,5 @@ jobs:
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Containerfile
-          # Fedora bootc: dnf pins and `latest`-style tags are not applicable
-          ignore: DL3041,DL3033
+          # Fedora bootc: dnf pins are not applicable; the cleanup line uses bash brace expansion, and separate RUN steps keep the layers readable
+          ignore: DL3041,DL3033,DL3059,SC3009
