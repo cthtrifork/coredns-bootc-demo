@@ -1,6 +1,7 @@
 .:53 {
     log
     errors
+    loop
     cancel
     cache {
         success 3600
