@@ -100,7 +100,7 @@ dig -p 5533 @localhost google.com +short
 ```sh
 # SSH into the VM
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-  -i /home/caspertdk/.ssh/id_ed25519 \
+  -i ~/.ssh/id_ed25519 \
   -p 2222 \
   cthtrifork@localhost
 
