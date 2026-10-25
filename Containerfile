@@ -1,7 +1,8 @@
 FROM quay.io/fedora/fedora-bootc:43
 
 #setup sudo to not require password
-RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo
+RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo \
+    && chmod 0440 /etc/sudoers.d/wheel-sudo
 
 # Write some metadata
 RUN echo VARIANT=\"CoreDNS bootc OS\" >> /usr/lib/os-release && \
