@@ -12,6 +12,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -116,7 +119,7 @@ jobs:
 
       - name: Wait for SSH
         run: |
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             vm true 2>/dev/null && exit 0
             sleep 5
           done
@@ -126,7 +129,7 @@ jobs:
       - name: "DNS demo: base image resolves over UDP and TCP"
         run: |
           # The CoreDNS service is up in the VM
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             vm systemctl is-active --quiet coredns.service && break
             sleep 5
           done
@@ -169,7 +172,7 @@ jobs:
           vm sudo systemctl reboot || true
 
           sleep 10
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             after=$(vm cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
             [ -n "$after" ] && [ "$after" != "$before" ] && exit 0
             sleep 5
@@ -182,7 +185,7 @@ jobs:
           vm sudo bootc status
           test "$(vm sudo bootc status --json | jq -r .status.booted.image.image.image)" = "$VM_REGISTRY/coredns-bootc:v2"
 
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             vm systemctl is-active --quiet coredns.service && break
             sleep 5
           done
@@ -208,14 +211,14 @@ jobs:
           vm sudo systemctl reboot || true
 
           sleep 10
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             after=$(vm cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
             [ -n "$after" ] && [ "$after" != "$before" ] && break
             sleep 5
           done
           test "$after" != "$before"
 
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             vm systemctl is-active --quiet coredns.service && break
             sleep 5
           done
