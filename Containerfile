@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-bootc:43
+FROM quay.io/fedora/fedora-bootc:45
 
 #setup sudo to not require password
 RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo \
